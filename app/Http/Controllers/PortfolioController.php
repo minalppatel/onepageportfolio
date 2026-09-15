@@ -179,13 +179,20 @@ class PortfolioController extends Controller
             'message' => ['required', 'string', 'min:10', 'max:3000'],
         ]);
 
-        // 1. Save to database
-        $contactMessage = ContactMessage::create($validated);
+        // 1. Save to database (optional / resilient for serverless)
+        $contactMessage = null;
+        try {
+            $contactMessage = ContactMessage::create($validated);
+        } catch (\Throwable $e) {
+            Log::warning('Database save skipped or failed on serverless: ' . $e->getMessage());
+            // Create in-memory model for mailable if DB save failed
+            $contactMessage = new ContactMessage($validated);
+        }
 
         // 2. Send email notification
         try {
             Mail::to('minalp391@gmail.com')->send(new ContactFormSubmitted($contactMessage));
-            Log::info('Contact form email dispatched to minalp391@gmail.com for lead ID: ' . $contactMessage->id);
+            Log::info('Contact form email dispatched to minalp391@gmail.com');
         } catch (\Throwable $e) {
             Log::error('Failed to send contact form email: ' . $e->getMessage());
         }
